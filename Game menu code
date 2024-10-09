@@ -1,0 +1,39 @@
+Код меню игры «GameMenu.cs» :
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+public class GameMenu : MonoBehaviour
+{
+public Text LevelText;
+public Text HighScoreText;
+public Text HighScoreText2;
+public Text HighScoreText3;
+void Start()
+{
+LevelText.text = "0";
+HighScoreText.text = PlayerPrefs.GetInt("HighScore").ToString();
+HighScoreText2.text = PlayerPrefs.GetInt("HighScore2").ToString();
+HighScoreText3.text = PlayerPrefs.GetInt("HighScore3").ToString();
+}
+public void PlayGame()
+{
+if(Game.startingLevel == 0)
+{
+Game.startingAtLevelZero = true;
+} 
+else
+{
+Game.startingAtLevelZero = false;
+}
+SceneManager.LoadScene("Level");
+}
+public void QuitGame()
+{
+Application.Quit();
+}
+public void ChangeValue (float value)
+{
+Game.startingLevel = (int)value;
+LevelText.text = value.ToString();
+}
+}
