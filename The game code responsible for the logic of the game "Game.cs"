@@ -1,0 +1,328 @@
+The game code responsible for the logic of the game "Game.cs":
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+public class Game : MonoBehaviour
+{
+//Размеры сетки
+public static int gridWidth = 13;//Длина игрового поля(X)
+public static int gridHeight = 24;//Высота игрового поля(Y)
+
+public static Transform[,] grid = new Transform[gridWidth, gridHeight];
+public static bool startingAtLevelZero;
+public static int startingLevel;
+public Canvas hud_canvas;
+public Canvas pause_canvas;
+public int scoreOneLine = 100;
+public int scoreTwoLine = 300;
+public int scoreThreeLine = 500;
+public int scoreFourLine = 1200;
+public int currentLevel = 0;
+private int numLinesCleared = 0;
+public static float fallSpeed = 1.0f;
+public static bool isPaused = false;
+public AudioClip clearedLineSound;
+private AudioSource audioSource;
+public Text hud_score;
+public Text hud_level;
+public Text hud_lines;
+private static int numberOfRowsThisTurn = 0; //Отслеживает сколько линий было очищено
+public static int currentScore = 0; //Текущий счет
+private static int startingHighScore;
+private static int startingHighScore2;
+private static int startingHighScore3;
+public static bool R = true;
+void Start()
+{
+currentScore = 0;
+hud_score.text = "0";
+currentLevel = startingLevel;
+hud_level.text = currentLevel.ToString();
+hud_lines.text = "0";
+SpawnNextTetromino();//запуск метода спавна <<------
+audioSource = GetComponent<AudioSource>();
+startingHighScore = PlayerPrefs.GetInt("HighScore");
+startingHighScore2 = PlayerPrefs.GetInt("HighScore2");
+startingHighScore3 = PlayerPrefs.GetInt("HighScore3");
+}
+void Update()
+{
+UpdateScore();
+UpdateUI();
+UpdateLevel();
+UpdateSpeed();
+#if UNITY_ANDROID
+#else
+CheckUserInput();
+#endif
+}
+public void CheckUserInput()
+{
+#if UNITY_ANDROID
+if (Time.timeScale == 1)
+{
+PauseGame();
+}
+else
+{
+ResumeGame();
+}
+#else
+if (Input.GetKeyUp(KeyCode.P))
+{
+if(Time.timeScale == 1)
+{
+PauseGame();
+}
+else
+{
+ResumeGame();
+}
+}
+#endif
+}
+void ResumeGame()
+{
+Time.timeScale = 1;
+audioSource.Play();
+isPaused = false;
+hud_canvas.enabled = true;
+pause_canvas.enabled = false;
+}
+void PauseGame()
+{
+Time.timeScale = 0;
+audioSource.Pause();
+isPaused = true;
+hud_canvas.enabled = false;
+pause_canvas.enabled = true;
+}
+void UpdateLevel()
+{
+if((startingAtLevelZero == true) || (startingAtLevelZero != true && numLinesCleared / 10 > startingLevel))
+currentLevel = numLinesCleared / 10;
+}
+void UpdateSpeed()
+{
+fallSpeed = 1.0f - ((float)currentLevel * 0.1f);
+}
+public void UpdateUI()
+{
+hud_score.text = currentScore.ToString();
+hud_level.text = currentLevel.ToString();
+hud_lines.text = numLinesCleared.ToString();
+}
+public void UpdateScore() //обновление счета
+{
+if (numberOfRowsThisTurn > 0) //Проверка сколько линий заполнено 1, 2, 3 или 4
+{
+if (numberOfRowsThisTurn == 1)
+{
+ClearedOneLine();
+numLinesCleared++;
+} 
+else if (numberOfRowsThisTurn == 2)
+{
+ClearedTwoLine();
+numLinesCleared += 2;
+} 
+else if (numberOfRowsThisTurn == 3)
+{
+ClearedThreeLine();
+numLinesCleared += 3;
+} 
+else if (numberOfRowsThisTurn == 4)
+{
+ClearedFourLine();
+numLinesCleared += 4;
+}
+numberOfRowsThisTurn = 0;
+PlayLineClearedSound();
+}
+}
+public void ClearedOneLine()
+{
+currentScore += scoreOneLine;
+}
+public void ClearedTwoLine()
+{
+currentScore += scoreTwoLine;
+}
+public void ClearedThreeLine()
+{
+currentScore += scoreThreeLine;
+}
+public void ClearedFourLine()
+{
+currentScore += scoreFourLine;
+}
+public void PlayLineClearedSound()
+{
+audioSource.PlayOneShot(clearedLineSound);
+}
+public void UpdateHighScore()
+{
+if(currentScore > startingHighScore)
+{
+PlayerPrefs.SetInt("HighScore3", startingHighScore2);
+PlayerPrefs.SetInt("HighScore2", startingHighScore);
+PlayerPrefs.SetInt("HighScore", currentScore);
+}
+else if(currentScore > startingHighScore2)
+{
+PlayerPrefs.SetInt("HighScore3", startingHighScore2);
+PlayerPrefs.SetInt("HighScore2", currentScore);
+}
+else if(currentScore > startingHighScore3)
+{
+PlayerPrefs.SetInt("HighScore3", currentScore);
+}
+}
+public bool CheckIsAboveGrid (Tetromino tetromino) 
+{
+for(int x = 0; x < gridWidth; ++x)  //Проверка над сеткой 1.Перебираем все значения X в цикле for 
+{
+foreach(Transform mino in tetromino.transform)
+{
+Vector2 pos = Round (mino.position);
+if (pos.y >= gridHeight - 1) //(gridHeight - 1)Проверяем позицию фигуры выше ли она чем высота сетки
+{
+return true;            //Если так то возвращаем true и вызывается метод GameOver
+}
+}
+}
+return false;//Возвращается false в том случае если у нас нет фигурок за границей сверху
+}
+public bool IsFullRowAt (int y) 
+{
+for (int x = 0; x < gridWidth; ++x)
+{
+if(grid[x,y] == null)
+{
+return false;
+}
+}
+//Поскольку мы нашли полную строку, мы увеличиваем переменную полной строки 
+numberOfRowsThisTurn++;
+return true;
+}
+public void DeletMinoAt(int y)
+{
+for(int x=0; x<gridWidth; ++x)
+{
+Destroy(grid[x, y].gameObject);
+}
+}
+public void MoveRowDown (int y)
+{
+for (int x = 0; x < gridWidth; ++x)
+{
+if (grid[x, y] != null)
+{
+grid[x, y - 1] = grid[x, y];
+grid[x, y] = null;
+grid[x, y - 1].position = new Vector3(x, y-1, 0);
+}else{
+grid[x, y - 1] = null;
+}
+}
+}
+public void MoveAllRowsDown (int y)
+{
+for(int i = y; i < gridHeight; ++i)
+{
+MoveRowDown(i);
+}
+}
+public void DeleteRow()
+{
+for(int y=0; y < gridHeight; ++y)
+{
+if (IsFullRowAt(y))
+{
+DeletMinoAt(y);
+MoveAllRowsDown(y+1);
+--y;
+}
+}
+}
+public void UpdateGrid(Tetromino tetromino)//Проверка сетки игрового поля на существующие елементы или на их отсутствие
+{
+for(int y = 0; y < gridHeight; ++y)//По высоте Y
+{
+for(int x = 0; x < gridWidth; ++x)//По длине X 
+{
+if (grid[x,y] != null)
+{
+if (grid[x,y].parent == tetromino.transform)
+{
+grid[x, y] = null;
+}
+}
+}
+}
+foreach(Transform mino in tetromino.transform)
+{
+Vector2 pos = Round(mino.position);
+if (pos.y < gridHeight)
+{
+grid[(int)pos.x, (int)pos.y] = mino;
+}
+}
+}
+public Transform GetTransformAtGridPosition(Vector2 pos) //Один из методов чтобы фигуры не проваливались
+{
+if (pos.y > gridHeight - 1)
+{
+return null;
+}else{
+return grid[(int)pos.x, (int)pos.y];
+}
+}
+public void SpawnNextTetromino()
+{
+GameObject nextTetromino = (GameObject)Instantiate(Resources.Load(GetRandomTetromino(), 
+typeof(GameObject)), new Vector3(6.0f, 22.0f), Quaternion.identity);
+}
+public bool CheckIsInsideGrid (Vector2 pos)
+{
+return ((int)pos.x >= 0 && (int)pos.x < gridWidth && (int)pos.y >= 0);
+}
+public Vector2 Round (Vector2 pos)
+{
+return new Vector2(Mathf.Round(pos.x), Mathf.Round(pos.y));
+}
+string GetRandomTetromino()
+{
+int randomTetromino = UnityEngine.Random.Range(1, 8);
+string randomTetrominoName = "Prefabs/T-figure";
+switch (randomTetromino)
+{
+case 1:
+randomTetrominoName = "Prefabs/T-figure";
+break;
+case 2:
+randomTetrominoName = "Prefabs/I-figure";
+break;
+case 3:
+randomTetrominoName = "Prefabs/L-figure";
+break;
+case 4:
+randomTetrominoName = "Prefabs/LR-figure";
+break;
+case 5:
+randomTetrominoName = "Prefabs/S-figure";
+break;
+case 6:
+randomTetrominoName = "Prefabs/Z-figure";
+break;
+case 7:
+randomTetrominoName = "Prefabs/ZR-figure";
+break;
+}
+return randomTetrominoName;
+}
+public void GameOver () //Класс который мы будем вызывать из класса tetromino если фигура выше сетки вызывается данный метод
+{SceneManager.LoadScene("GameOver");
+UpdateHighScore();}
+}
